@@ -1,75 +1,72 @@
---[[
-Egg Spawner Script with Start/Stop Button
-Works with KRNL
-]]
+-- Egg Spawner Script with Start/Stop
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
--- CONFIG
-local eggModelName = "Egg" -- Change this to the exact name of your egg model in Workspace or ReplicatedStorage
-local spawnInterval = 2    -- seconds between spawns
-local maxEggs = 20         -- maximum eggs in the world at once
+-- Configuration
+local EggModelName = "Egg" -- Name of the egg model in ReplicatedStorage
+local SpawnInterval = 3 -- Seconds between each spawn
+local MaxEggs = 10 -- Maximum eggs allowed in the world
 
--- VARIABLES
-local runService = game:GetService("RunService")
-local replicatedStorage = game:GetService("ReplicatedStorage")
-local eggsFolder = workspace:FindFirstChild("EggsFolder") or Instance.new("Folder", workspace)
-eggsFolder.Name = "EggsFolder"
+-- Variables
+local spawning = false
+local spawnedEggs = {}
 
-local isSpawning = false
-local spawnConnection = nil
-
--- CREATE INTERFACE
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "EggSpawnerGUI"
-screenGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
-
-local startButton = Instance.new("TextButton")
-startButton.Size = UDim2.new(0, 100, 0, 50)
-startButton.Position = UDim2.new(0, 20, 0, 200)
-startButton.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
-startButton.Text = "Start Spawning"
-startButton.Parent = screenGui
-
-local stopButton = Instance.new("TextButton")
-stopButton.Size = UDim2.new(0, 100, 0, 50)
-stopButton.Position = UDim2.new(0, 20, 0, 260)
-stopButton.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
-stopButton.Text = "Stop Spawning"
-stopButton.Parent = screenGui
-
--- FUNCTION TO SPAWN EGG
+-- Function to spawn an egg
 local function spawnEgg()
-    local eggTemplate = replicatedStorage:FindFirstChild(eggModelName) or workspace:FindFirstChild(eggModelName)
-    if eggTemplate and #eggsFolder:GetChildren() < maxEggs then
+    if not spawning then return end
+    if #spawnedEggs >= MaxEggs then return end
+
+    local eggTemplate = ReplicatedStorage:FindFirstChild(EggModelName)
+    if eggTemplate then
         local newEgg = eggTemplate:Clone()
-        newEgg.Parent = eggsFolder
         newEgg.Position = Vector3.new(
             math.random(-50, 50), 
             5, 
             math.random(-50, 50)
         )
-    end
-end
+        newEgg.Parent = workspace
+        table.insert(spawnedEggs, newEgg)
 
--- START SPAWNING
-local function startSpawning()
-    if not isSpawning then
-        isSpawning = true
-        spawnConnection = runService.Heartbeat:Connect(function(dt)
-            spawnEgg()
-            wait(spawnInterval)
+        -- Remove from list when destroyed
+        newEgg.AncestryChanged:Connect(function()
+            for i, egg in ipairs(spawnedEggs) do
+                if egg == newEgg then
+                    table.remove(spawnedEggs, i)
+                    break
+                end
+            end
         end)
+    else
+        warn("Egg model not found in ReplicatedStorage")
     end
 end
 
--- STOP SPAWNING
+-- Start spawning
+local function startSpawning()
+    spawning = true
+    while spawning do
+        spawnEgg()
+        wait(SpawnInterval)
+    end
+end
+
+-- Stop spawning
 local function stopSpawning()
-    isSpawning = false
-    if spawnConnection then
-        spawnConnection:Disconnect()
-        spawnConnection = nil
-    end
+    spawning = false
 end
 
--- BUTTON EVENTS
-startButton.MouseButton1Click:Connect(startSpawning)
-stopButton.MouseButton1Click:Connect(stopSpawning)
+-- UI
+local ScreenGui = Instance.new("ScreenGui", Players.LocalPlayer:WaitForChild("PlayerGui"))
+
+local StartButton = Instance.new("TextButton", ScreenGui)
+StartButton.Size = UDim2.new(0, 100, 0, 50)
+StartButton.Position = UDim2.new(0, 50, 0, 50)
+StartButton.Text = "Start Eggs"
+
+local StopButton = Instance.new("TextButton", ScreenGui)
+StopButton.Size = UDim2.new(0, 100, 0, 50)
+StopButton.Position = UDim2.new(0, 160, 0, 50)
+StopButton.Text = "Stop Eggs"
+
+StartButton.MouseButton1Click:Connect(startSpawning)
+StopButton.MouseButton1Click:Connect(stopSpawning)
